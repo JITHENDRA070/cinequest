@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineQuest Pro</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f1014;
+            color: #f3f4f6;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .modal-enter { opacity: 0; transform: scale(0.98); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms ease-out, transform 200ms ease-out; }
+        
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Error Banner */
+        #network-error {
+            display: none;
+            background-color: #7f1d1d;
+            color: #fecaca;
+            padding: 1rem;
+            text-align: center;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            font-weight: bold;
+            border-top: 1px solid #991b1b;
+        }
+    </style>
+</head>
+<body class="pb-20">
+
+    <div id="network-error">
+        <p>⚠ Connection Error: The Movie Database (TMDB) is blocked on this network.</p>
+        <p class="text-xs font-normal mt-1 opacity-80">Try switching to mobile data or a different WiFi.</p>
+    </div>
+
+    <header class="sticky top-0 z-30 bg-[#0f1014]/95 backdrop-blur-md border-b border-gray-800 shadow-2xl">
+        <div class="max-w-7xl mx-auto px-4 py-4 space-y-4">
+            
+            <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2 select-none shrink-0 cursor-pointer" onclick="resetApp()">
+                    <div class="bg-gradient-to-tr from-red-700 to-red-500 p-2 rounded-lg shadow-lg shadow-red-900/20">
+                        <i data-lucide="film" class="w-6 h-6 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold tracking-tight">
+                        Cine<span class="text-red-500">Quest</span>
+                    </h1>
+                </div>
+
+                <div class="flex bg-gray-800 rounded-lg p-1 border border-gray-700 shrink-0 overflow-x-auto max-w-full">
+                    <button onclick="setMediaType('movie')" class="type-btn bg-red-600 text-white shadow-md px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap" data-type="movie">Movies</button>
+                    <button onclick="setMediaType('tv')" class="type-btn text-gray-400 hover:text-white hover:bg-gray-700 px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap" data-type="tv">TV Shows</button>
+                    <button onclick="setMediaType('anime')" class="type-btn text-gray-400 hover:text-white hover:bg-gray-700 px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap" data-type="anime">Anime</button>
+                </div>
+
+                <div class="relative w-full lg:max-w-xs">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i data-lucide="search" class="h-4 w-4 text-gray-500"></i>
+                    </div>
+                    <input type="text" id="search-input" 
+                        class="block w-full pl-9 pr-3 py-2 border border-gray-700 rounded-full bg-gray-800/50 text-gray-300 placeholder-gray-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 sm:text-sm transition-all" 
+                        placeholder="Search..." oninput="handleSearch(this.value)">
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button onclick="handleSurpriseMe()" class="flex-1 sm:flex-none bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold py-2 px-4 rounded-lg shadow-lg shadow-purple-900/20 flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <i data-lucide="gift" class="w-4 h-4"></i> Surprise Me!
+                </button>
+                
+                <button onclick="handleRandomPick()" class="flex-1 sm:flex-none bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-white text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <i data-lucide="shuffle" class="w-4 h-4"></i> Random Pick
+                </button>
+
+                <button id="top10-btn" onclick="toggleTop10()" class="flex-1 sm:flex-none bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 hover:text-yellow-400 text-xs font-bold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-all active:scale-95">
+                    <i data-lucide="trophy" class="w-4 h-4"></i> Top 10
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="relative">
+                    <select id="genre-select" onchange="handleGenre(this.value)" class="w-full appearance-none bg-gray-800 border border-gray-700 text-gray-300 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
+                        <option value="">All Genres</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none"></i>
+                </div>
+
+                <div class="relative">
+                    <select id="lang-select" onchange="handleLanguage(this.value)" class="w-full appearance-none bg-gray-800 border border-gray-700 text-gray-300 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
+                        <option value="">All Languages</option>
+                        <option value="en">English</option>
+                        <option value="hi">Hindi</option>
+                        <option value="ja">Japanese</option>
+                        <option value="ko">Korean</option>
+                        <option value="es">Spanish</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="it">Italian</option>
+                        <option value="zh">Chinese</option>
+                        <option value="te">Telugu</option>
+                        <option value="ta">Tamil</option>
+                        <option value="ml">Malayalam</option>
+                        <option value="kn">Kannada</option>
+                        <option value="bn">Bengali</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none"></i>
+                </div>
+
+                <div class="relative">
+                    <select id="rating-select" onchange="handleRating(this.value)" class="w-full appearance-none bg-gray-800 border border-gray-700 text-gray-300 py-2 px-4 pr-8 rounded-lg text-sm focus:outline-none focus:border-red-500 transition-colors cursor-pointer">
+                        <option value="all">Rating: All (Default)</option>
+                        <option value="R">18+ (R / Adults)</option>
+                        <option value="PG-13">PG-13 (Teens)</option>
+                        <option value="PG">9+ (PG / Kids)</option>
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-3 top-2.5 h-4 w-4 text-gray-400 pointer-events-none"></i>
+                </div>
+                
+                <div class="hidden md:flex items-center justify-end text-xs text-gray-500 font-mono" id="results-count">Ready</div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 pt-8">
+        <div id="main-loader" class="hidden py-20 flex justify-center">
+            <div class="spinner border-4 border-gray-800 border-t-red-600 rounded-full h-10 w-10"></div>
+        </div>
+        
+        <div id="status-message" class="hidden py-10 text-center">
+            <p class="text-red-400 font-bold mb-2">Unable to load content</p>
+            <button onclick="fetchContent()" class="bg-gray-800 px-4 py-2 rounded text-xs hover:bg-gray-700">Retry Connection</button>
+        </div>
+
+        <div id="results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+
+        <div id="no-results" class="hidden text-center py-24">
+            <p class="text-lg text-gray-300 font-medium">No results found.</p>
+        </div>
+
+        <div id="load-more-container" class="hidden py-12 flex justify-center">
+            <button onclick="loadMore()" class="bg-gray-800 hover:bg-gray-700 text-white px-8 py-3 rounded-full border border-gray-700 font-bold transition-all flex items-center gap-2">
+                Load More <i data-lucide="chevron-down" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </main>
+
+    <div id="modal-backdrop" class="fixed inset-0 z-50 hidden flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity" onclick="closeModal()"></div>
+        
+        <div id="modal-content" class="relative bg-[#16181f] w-full sm:max-w-5xl h-full sm:h-[85vh] sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl border border-gray-800 transition-all duration-200 scale-95 opacity-0">
+            
+            <button onclick="closeModal()" class="absolute top-4 right-4 z-40 p-2 bg-black/60 sm:hidden hover:bg-red-600 rounded-full text-white transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
+
+            <div id="video-container" class="relative w-full aspect-video hidden bg-black shrink-0 border-b border-gray-800">
+                <button onclick="stopTrailer()" class="absolute top-4 right-4 z-30 p-2 bg-black/50 hover:bg-red-600 rounded-full text-white transition-all backdrop-blur-md border border-white/10 flex items-center gap-2">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+                <iframe id="youtube-frame" class="w-full h-full" src="" title="Trailer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            </div>
+
+            <div id="modal-header-image" class="relative w-full h-48 sm:h-72 hidden sm:block bg-black shrink-0">
+                 <button onclick="closeModal()" class="absolute top-4 right-4 z-30 p-2 bg-black/40 hover:bg-red-600 rounded-full text-white transition-all backdrop-blur-md border border-white/10"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <img id="modal-backdrop-img" src="" class="w-full h-full object-cover opacity-40" alt="Backdrop">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#16181f] to-transparent"></div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto min-h-0 relative -mt-0 sm:-mt-16 px-4 sm:px-8 pb-8 custom-scrollbar">
+                <div class="flex flex-col md:flex-row gap-6 md:gap-8 pt-4 sm:pt-0">
+                    <div class="shrink-0 w-full md:w-64 flex flex-col gap-4">
+                        <div class="w-40 md:w-full aspect-[2/3] rounded-lg shadow-2xl overflow-hidden border-2 border-gray-800 mx-auto md:mx-0 bg-gray-800">
+                            <img id="modal-poster" src="" alt="Poster" class="w-full h-full object-cover">
+                        </div>
+                        <button id="trailer-btn" onclick="playTrailer()" class="hidden w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-900/20 transform active:scale-95">
+                            <i data-lucide="play-circle" class="w-5 h-5"></i> <span id="trailer-text">Watch Trailer</span>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 pt-4 sm:pt-20 space-y-6">
+                        <div>
+                            <h2 id="modal-title" class="text-2xl md:text-4xl font-black text-white leading-tight mb-2 text-center md:text-left"></h2>
+                            <div class="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-sm text-gray-400">
+                                <div class="flex items-center gap-1 text-yellow-400 font-bold bg-yellow-400/10 px-2 py-0.5 rounded"><i data-lucide="star" class="w-3.5 h-3.5 fill-yellow-400"></i><span id="modal-rating"></span></div>
+                                <span id="modal-year"></span>
+                                <span id="modal-lang" class="uppercase border border-gray-700 px-1 rounded"></span>
+                            </div>
+                            <div id="modal-genres" class="flex flex-wrap justify-center md:justify-start gap-2 mt-4"></div>
+                        </div>
+
+                        <div class="bg-gray-800/30 p-4 rounded-xl border border-gray-800">
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-2">Synopsis</h3>
+                            <div class="relative">
+                                <p id="modal-overview" class="text-gray-300 leading-relaxed text-sm transition-all duration-300 line-clamp-3"></p>
+                                <button id="read-more-btn" onclick="toggleSynopsis()" class="hidden text-red-500 text-xs font-bold mt-2 hover:text-white transition-colors uppercase tracking-wider">Read More</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-3">Top Cast (Click to view)</h3>
+                            <div id="modal-cast" class="flex gap-3 overflow-x-auto pb-4 no-scrollbar scrollbar-thumb-red-900/50 snap-x min-h-[100px]"></div>
+                        </div>
+
+                        <div class="border-t border-gray-800 pt-4">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2"><i data-lucide="monitor-play" class="w-3.5 h-3.5 text-red-500"></i> Available to Stream</h3>
+                            <div id="modal-providers" class="flex flex-wrap gap-2 min-h-[40px]"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="person-modal-backdrop" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-0 sm:p-4 overflow-hidden">
+        <div class="absolute inset-0 bg-black/95 backdrop-blur-md transition-opacity" onclick="closePersonModal()"></div>
+        
+        <div id="person-modal-content" class="relative bg-[#1a1d26] w-full sm:max-w-4xl h-full sm:h-[85vh] sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl border border-gray-700 transition-all duration-200 scale-95 opacity-0">
+            
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-[#16181f]">
+                <h2 class="text-lg font-bold text-white flex items-center gap-2"><i data-lucide="user" class="text-red-500 w-5 h-5"></i> Actor Profile</h2>
+                <button onclick="closePersonModal()" class="p-2 hover:bg-red-600 rounded-full text-white transition-colors"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 custom-scrollbar min-h-0">
+                <div id="person-loader" class="flex items-center justify-center h-64 hidden">
+                    <div class="spinner border-4 border-gray-800 border-t-red-600 rounded-full h-10 w-10"></div>
+                </div>
+
+                <div id="person-body" class="flex flex-col md:flex-row gap-8">
+                    <div class="w-40 md:w-56 shrink-0 mx-auto md:mx-0">
+                        <div class="aspect-[2/3] rounded-xl overflow-hidden border-2 border-gray-700 shadow-xl">
+                            <img id="person-img" src="" class="w-full h-full object-cover bg-gray-800" alt="Actor">
+                        </div>
+                        <div class="mt-4 space-y-2 text-center md:text-left">
+                            <p class="text-xs text-gray-500 uppercase font-bold">Born</p>
+                            <p id="person-birthday" class="text-sm text-gray-300"></p>
+                            <p id="person-place" class="text-xs text-gray-400"></p>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 space-y-6 min-w-0">
+                        <div>
+                            <h1 id="person-name" class="text-3xl font-bold text-white mb-3"></h1>
+                            <h3 class="text-sm font-bold text-gray-400 uppercase mb-2">Biography</h3>
+                            <div class="relative">
+                                <p id="person-bio" class="text-gray-300 text-sm leading-relaxed line-clamp-3"></p>
+                                <button id="person-bio-btn" onclick="togglePersonBio()" class="text-red-500 text-xs font-bold mt-2 hover:underline hidden">Read More</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-400 uppercase mb-3">Known For</h3>
+                            <div id="person-credits" class="flex flex-nowrap gap-3 overflow-x-auto pb-4 no-scrollbar scrollbar-thumb-gray-700 snap-x"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '93727321f6ea31cfee04f4cdb666d225';  
+        const BASE_URL = 'https://api.themoviedb.org/3';
+        const IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+        const BACKDROP_BASE = 'https://image.tmdb.org/t/p/original';
+        const LOGO_BASE = 'https://image.tmdb.org/t/p/w200';
+
+        const state = {
+            searchQuery: '',
+            genres: [],
+            selectedGenre: '',
+            selectedLanguage: '',
+            selectedRating: 'all',
+            mediaType: 'movie',
+            results: [],
+            page: 1,
+            totalPages: 0,
+            loading: false,
+            timer: null,
+            isSynopsisExpanded: false,
+            isBioExpanded: false,
+            currentTrailerKey: null,
+            isTop10Mode: false
+        };
+
+        const els = {
+            grid: document.getElementById('results-grid'),
+            loader: document.getElementById('main-loader'),
+            noResults: document.getElementById('no-results'),
+            loadMoreBtn: document.getElementById('load-more-container'),
+            statusMsg: document.getElementById('status-message'),
+            networkError: document.getElementById('network-error'),
+            genreSelect: document.getElementById('genre-select'),
+            ratingSelect: document.getElementById('rating-select'),
+            resultsCount: document.getElementById('results-count'),
+            top10Btn: document.getElementById('top10-btn'),
+            modal: {
+                backdrop: document.getElementById('modal-backdrop'),
+                content: document.getElementById('modal-content'),
+                headerImage: document.getElementById('modal-header-image'),
+                videoContainer: document.getElementById('video-container'),
+                youtubeFrame: document.getElementById('youtube-frame'),
+                poster: document.getElementById('modal-poster'),
+                backdropImg: document.getElementById('modal-backdrop-img'),
+                title: document.getElementById('modal-title'),
+                rating: document.getElementById('modal-rating'),
+                year: document.getElementById('modal-year'),
+                lang: document.getElementById('modal-lang'),
+                genres: document.getElementById('modal-genres'),
+                overview: document.getElementById('modal-overview'),
+                readMore: document.getElementById('read-more-btn'),
+                cast: document.getElementById('modal-cast'),
+                providers: document.getElementById('modal-providers'),
+                trailerBtn: document.getElementById('trailer-btn'),
+                trailerText: document.getElementById('trailer-text')
+            },
+            person: {
+                backdrop: document.getElementById('person-modal-backdrop'),
+                content: document.getElementById('person-modal-content'),
+                loader: document.getElementById('person-loader'),
+                body: document.getElementById('person-body'),
+                img: document.getElementById('person-img'),
+                name: document.getElementById('person-name'),
+                birthday: document.getElementById('person-birthday'),
+                place: document.getElementById('person-place'),
+                bio: document.getElementById('person-bio'),
+                bioBtn: document.getElementById('person-bio-btn'),
+                credits: document.getElementById('person-credits')
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            safeLucide();
+            fetchGenres();
+            fetchContent();
+        });
+
+        function safeLucide() { if (typeof lucide !== 'undefined') lucide.createIcons(); }
+
+        function showError() {
+            els.networkError.style.display = 'block';
+            els.statusMsg.classList.remove('hidden');
+            els.loader.classList.add('hidden');
+        }
+
+        async function fetchGenres() {
+            try {
+                const endpoint = state.mediaType === 'movie' ? '/genre/movie/list' : '/genre/tv/list';
+                const res = await fetch(`${BASE_URL}${endpoint}?api_key=${API_KEY}&language=en-US`);
+                if (!res.ok) throw new Error("Network response was not ok");
+                const data = await res.json();
+                state.genres = data.genres || [];
+                renderGenres();
+            } catch (e) {  
+                console.error(e);
+                showError();
+            }
+        }
+
+        // --- FETCH CONTENT ---
+        async function fetchContent(isLoadMore = false) {
+            // Reset error state
+            els.networkError.style.display = 'none';
+            els.statusMsg.classList.add('hidden');
+
+            if (!isLoadMore) {
+                state.page = 1;
+                state.results = [];
+                els.grid.innerHTML = '';
+                state.loading = true;
+                updateUIState();
+            }
+            try {
+                let url;
+                let apiType = state.mediaType === 'anime' ? 'tv' : state.mediaType;
+                let extraParams = '';
+                if (state.mediaType === 'anime') extraParams += '&with_genres=16';
+
+                if (state.mediaType === 'movie') {
+                    if (state.selectedRating && state.selectedRating !== 'all') {
+                         extraParams += `&certification_country=US&certification.lte=${state.selectedRating}`;
+                    }
+                }  
+
+                if (state.searchQuery.trim()) {
+                    url = `${BASE_URL}/search/${apiType}?api_key=${API_KEY}&language=en-US&query=${encodeURIComponent(state.searchQuery)}&page=${state.page}`;
+                } else {
+                    const genreParam = state.selectedGenre ? `&with_genres=${state.selectedGenre}` : '';
+                    const langParam = state.selectedLanguage ? `&with_original_language=${state.selectedLanguage}` : '';
+                    
+                    url = `${BASE_URL}/discover/${apiType}?api_key=${API_KEY}&language=en-US&sort_by=popularity.desc${genreParam}${langParam}${extraParams}&page=${state.page}`;
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Blocked");
+                
+                const data = await res.json();
+                const uniqueNew = (data.results || []).filter(i => !state.results.some(e => e.id === i.id));
+                
+                state.results = [...state.results, ...uniqueNew];
+                state.totalPages = data.total_pages;
+                
+                if (state.isTop10Mode) {
+                    renderCards(state.results.slice(0, 10));
+                } else {
+                    renderCards(isLoadMore ? uniqueNew : state.results);
+                }
+                
+            } catch (e) {  
+                console.error(e);
+                showError();
+            }  
+            finally { state.loading = false; updateUIState(); }
+        }
+
+        // --- SURPRISE ME (Top Rated Random) ---
+        async function handleSurpriseMe() {
+            try {
+                const apiType = state.mediaType === 'anime' ? 'tv' : state.mediaType;
+                let url;
+
+                // Fixed: Anime needs /discover to use with_genres, /top_rated doesn't support genres
+                if (state.mediaType === 'anime') {
+                    url = `${BASE_URL}/discover/tv?api_key=${API_KEY}&language=en-US&sort_by=vote_average.desc&vote_count.gte=300&with_genres=16&page=1`;
+                } else {
+                    url = `${BASE_URL}/${apiType}/top_rated?api_key=${API_KEY}&language=en-US&page=1`;
+                }
+                
+                const res = await fetch(url);
+                const data = await res.json();
+                const items = data.results || [];
+                
+                if (items.length > 0) {
+                    const randomItem = items[Math.floor(Math.random() * items.length)];
+                    // Ensure item is in state so openModal can find it
+                    if (!state.results.find(i => i.id === randomItem.id)) {
+                        state.results.push(randomItem);
+                    }
+                    openModal(randomItem.id);
+                } else {
+                    alert("No top rated items found to surprise you!");
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // --- RANDOM PICK (Contextual) ---
+        function handleRandomPick() {
+            if (state.results.length === 0) {
+                alert("Wait for results to load or select different filters.");
+                return;
+            }
+            const randomItem = state.results[Math.floor(Math.random() * state.results.length)];
+            openModal(randomItem.id);
+        }
+
+        // --- TOP 10 TOGGLE ---
+        function toggleTop10() {
+            state.isTop10Mode = !state.isTop10Mode;
+            
+            if (state.isTop10Mode) {
+                els.top10Btn.classList.remove('text-gray-300');
+                els.top10Btn.classList.add('text-yellow-400', 'border-yellow-400');
+                renderCards(state.results.slice(0, 10));
+                els.loadMoreBtn.classList.add('hidden');
+            } else {
+                els.top10Btn.classList.add('text-gray-300');
+                els.top10Btn.classList.remove('text-yellow-400', 'border-yellow-400');
+                renderCards(state.results);
+                updateUIState();
+            }
+        }
+
+
+        function renderGenres() {
+            els.genreSelect.innerHTML = '<option value="">All Genres</option>';
+            state.genres.forEach(g => {
+                const option = document.createElement('option');
+                option.value = g.id;
+                option.textContent = g.name;
+                els.genreSelect.appendChild(option);
+            });
+            els.genreSelect.value = state.selectedGenre;
+        }
+
+        function renderCards(items) {
+            if (!state.loading && state.page === 1 && !state.isTop10Mode) els.grid.innerHTML = '';
+            if (state.isTop10Mode) els.grid.innerHTML = '';
+
+            if (state.page === 1 || state.isTop10Mode) els.grid.innerHTML = '';
+
+            items.forEach(item => {
+                const title = item.title || item.name;
+                const date = (item.release_date || item.first_air_date || '').split('-')[0] || 'N/A';
+                const poster = item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : null;
+                
+                const card = document.createElement('div');
+                card.className = "group relative bg-gray-800 rounded-xl overflow-hidden cursor-pointer shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-red-900/30";
+                card.onclick = () => openModal(item.id);  
+                
+                card.innerHTML = `
+                    <div class="aspect-[2/3] w-full bg-gray-700 relative overflow-hidden">
+                        ${poster ? `<img src="${poster}" loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" alt="${title}">`  
+                                 : `<div class="w-full h-full flex flex-col items-center justify-center text-gray-600 p-4 text-center"><i data-lucide="film" class="w-8 h-8 mb-2 opacity-50"></i><span class="text-xs">No Image</span></div>`}
+                        <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-yellow-400 border border-yellow-400/20 flex items-center gap-1"><i data-lucide="star" class="w-3 h-3 fill-yellow-400"></i>${item.vote_average?.toFixed(1)}</div>
+                    </div>
+                    <div class="p-3">
+                        <h3 class="font-bold text-sm text-gray-100 truncate leading-tight">${title}</h3>
+                        <div class="flex justify-between items-center mt-1.5">
+                            <span class="text-xs text-gray-400 font-medium">${date}</span>
+                            <span class="text-[10px] uppercase bg-gray-700 text-gray-300 px-1.5 rounded">${item.original_language || '??'}</span>
+                        </div>
+                    </div>
+                `;
+                els.grid.appendChild(card);
+            });
+            safeLucide();
+        }
+
+        function updateUIState() {
+            els.loader.classList.toggle('hidden', !(state.loading && state.page === 1));
+            els.noResults.classList.toggle('hidden', state.loading || state.results.length > 0);
+            
+            if (state.isTop10Mode) {
+                els.loadMoreBtn.classList.add('hidden');
+            } else {
+                els.loadMoreBtn.classList.toggle('hidden', state.loading || state.results.length === 0 || state.page >= state.totalPages);
+            }
+
+            els.resultsCount.textContent = `${state.results.length} titles`;
+            document.querySelectorAll('.type-btn').forEach(btn => {
+                const isActive = btn.dataset.type === state.mediaType;
+                btn.className = `type-btn px-4 py-1.5 rounded-md text-sm font-bold transition-all whitespace-nowrap ${isActive ? 'bg-red-600 text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`;
+            });
+        }
+
+        function openModal(id) {
+            const item = state.results.find(i => i.id === id);
+            if (!item) return;
+
+            els.modal.title.textContent = item.title || item.name;
+            els.modal.overview.textContent = item.overview || "No description available.";
+            els.modal.overview.classList.add('line-clamp-3');
+            state.isSynopsisExpanded = false;
+            els.modal.readMore.textContent = 'Read More';
+            els.modal.readMore.classList.toggle('hidden', !item.overview || item.overview.length <= 150);
+
+            els.modal.rating.textContent = item.vote_average?.toFixed(1) || 'N/A';
+            els.modal.year.textContent = (item.release_date || item.first_air_date || '').split('-')[0];
+            els.modal.lang.textContent = item.original_language || 'en';
+            els.modal.poster.src = item.poster_path ? `${IMAGE_BASE}${item.poster_path}` : '';
+            els.modal.backdropImg.src = item.backdrop_path ? `${BACKDROP_BASE}${item.backdrop_path}` : '';
+            
+            if (state.genres.length > 0 && item.genre_ids) {
+                const names = item.genre_ids.map(id => state.genres.find(g => g.id === id)?.name).filter(Boolean);
+                els.modal.genres.innerHTML = names.map(n => `<span class="px-3 py-1 rounded-md bg-gray-800 text-xs font-medium text-gray-300 border border-gray-700">${n}</span>`).join('');
+            } else els.modal.genres.innerHTML = '';
+
+            stopTrailer();
+            state.currentTrailerKey = null;
+            els.modal.trailerBtn.classList.add('hidden');
+            
+            els.modal.cast.innerHTML = '<p class="text-gray-500 text-xs italic self-center px-2">Loading cast...</p>';
+            els.modal.providers.innerHTML = '<p class="text-gray-500 text-xs italic self-center">Checking availability...</p>';
+
+            els.modal.backdrop.classList.remove('hidden');
+            setTimeout(() => { els.modal.content.classList.remove('scale-95', 'opacity-0'); els.modal.content.classList.add('scale-100', 'opacity-100'); }, 10);
+
+            fetchModalExtras(id);
+        }
+
+        function closeModal() {
+            stopTrailer();
+            els.modal.content.classList.remove('scale-100', 'opacity-100');
+            els.modal.content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => els.modal.backdrop.classList.add('hidden'), 200);
+        }
+
+        function playTrailer() {
+            if (state.currentTrailerKey) {
+                els.modal.headerImage.classList.add('hidden');
+                els.modal.videoContainer.classList.remove('hidden');
+                els.modal.youtubeFrame.src = `https://www.youtube.com/embed/${state.currentTrailerKey}?autoplay=1&rel=0`;
+            } else {
+                alert("Trailer not available");
+            }
+        }
+
+        function stopTrailer() {
+            els.modal.youtubeFrame.src = '';
+            els.modal.videoContainer.classList.add('hidden');
+            els.modal.headerImage.classList.remove('hidden');
+        }
+
+        async function fetchModalExtras(id) {
+            try {
+                // Determine API type based on the CURRENT state (swapToMovie handles updating state)
+                const apiType = state.mediaType === 'movie' ? 'movie' : 'tv';
+                
+                const [vidRes, credRes, provRes] = await Promise.all([
+                    fetch(`${BASE_URL}/${apiType}/${id}/videos?api_key=${API_KEY}&language=en-US`),
+                    fetch(`${BASE_URL}/${apiType}/${id}/credits?api_key=${API_KEY}&language=en-US`),
+                    fetch(`${BASE_URL}/${apiType}/${id}/watch/providers?api_key=${API_KEY}`)
+                ]);
+                
+                const videos = await vidRes.json();
+                const credits = await credRes.json();
+                const providers = await provRes.json();
+
+                // Safe access to results
+                const videoResults = videos.results || [];
+                const trailer = videoResults.find(v => v.site === "YouTube" && v.type === "Trailer") || videoResults.find(v => v.site === "YouTube");
+                
+                if (trailer) {
+                    state.currentTrailerKey = trailer.key;
+                    els.modal.trailerText.textContent = "Watch Trailer";
+                    els.modal.trailerBtn.classList.remove('hidden');
+                } else {
+                    els.modal.trailerBtn.classList.add('hidden');
+                }
+
+                if (credits.cast?.length > 0) {
+                    els.modal.cast.innerHTML = credits.cast.slice(0, 10).map(actor => `
+                        <div class="w-24 shrink-0 snap-start flex flex-col gap-2 cursor-pointer hover:scale-105 transition-transform group" onclick="openPersonModal(${actor.id})">
+                            <div class="w-24 h-24 rounded-full bg-gray-800 overflow-hidden shadow-md border border-gray-700 mx-auto group-hover:border-red-500">
+                                 ${actor.profile_path ? `<img src="${IMAGE_BASE}${actor.profile_path}" class="w-full h-full object-cover" alt="${actor.name}">` : `<div class="w-full h-full flex items-center justify-center text-xs text-gray-500">N/A</div>`}
+                            </div>
+                            <div class="text-center">
+                                <p class="text-xs font-bold text-gray-200 truncate w-full group-hover:text-red-400">${actor.name}</p>
+                                <p class="text-[10px] text-gray-500 truncate w-full">${actor.character}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                } else els.modal.cast.innerHTML = '<p class="text-gray-500 text-xs italic self-center">Cast unavailable.</p>';
+
+                const flatrate = (providers.results?.IN || providers.results?.US)?.flatrate || [];
+                if (flatrate.length > 0) {
+                    els.modal.providers.innerHTML = flatrate.map(prov => `
+                        <div class="group relative w-10 h-10" title="${prov.provider_name}">
+                            <img src="${LOGO_BASE}${prov.logo_path}" class="w-full h-full rounded-lg shadow-sm hover:scale-110 transition-transform" alt="${prov.provider_name}">
+                        </div>
+                    `).join('');
+                } else els.modal.providers.innerHTML = '<p class="text-gray-500 text-xs italic self-center">Not available for streaming.</p>';
+            } catch (e) { console.error(e); }
+        }
+
+        function toggleSynopsis() {
+            state.isSynopsisExpanded = !state.isSynopsisExpanded;
+            els.modal.overview.classList.toggle('line-clamp-3', !state.isSynopsisExpanded);
+            els.modal.readMore.textContent = state.isSynopsisExpanded ? 'Show Less' : 'Read More';
+        }
+
+        async function openPersonModal(id) {
+            els.person.body.classList.add('hidden');
+            els.person.loader.classList.remove('hidden');
+            els.person.backdrop.classList.remove('hidden');
+            
+            setTimeout(() => {
+                els.person.content.classList.remove('scale-95', 'opacity-0');
+                els.person.content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            try {
+                const res = await fetch(`${BASE_URL}/person/${id}?api_key=${API_KEY}&append_to_response=combined_credits&language=en-US`);
+                const data = await res.json();
+
+                els.person.name.textContent = data.name;
+                els.person.birthday.textContent = data.birthday || 'Unknown';
+                els.person.place.textContent = data.place_of_birth || '';
+                els.person.img.src = data.profile_path ? `${IMAGE_BASE}${data.profile_path}` : '';
+                
+                els.person.bio.textContent = data.biography || "No biography available.";
+                els.person.bio.classList.add('line-clamp-3');
+                state.isBioExpanded = false;
+                els.person.bioBtn.textContent = "Read More";
+                els.person.bioBtn.classList.toggle('hidden', !data.biography || data.biography.length < 200);
+
+                const topCredits = data.combined_credits.cast
+                    .sort((a, b) => b.popularity - a.popularity)
+                    .slice(0, 15);
+
+                els.person.credits.innerHTML = topCredits.map(c => `
+                    <div class="w-24 flex-shrink-0 snap-start flex flex-col gap-2 cursor-pointer hover:opacity-80" onclick="swapToMovie(${c.id}, '${c.media_type}')">
+                        <div class="w-24 h-36 rounded-lg bg-gray-800 overflow-hidden border border-gray-700">
+                             ${c.poster_path ? `<img src="${IMAGE_BASE}${c.poster_path}" class="w-full h-full object-cover">` : `<div class="h-full flex items-center justify-center text-xs text-gray-500">N/A</div>`}
+                        </div>
+                        <p class="text-[10px] font-bold text-center text-gray-300 truncate w-full">${c.title || c.name}</p>
+                    </div>
+                `).join('');
+
+            } catch(e) { console.error(e); }
+            finally {
+                els.person.loader.classList.add('hidden');
+                els.person.body.classList.remove('hidden');
+            }
+        }
+
+        function closePersonModal() {
+            els.person.content.classList.remove('scale-100', 'opacity-100');
+            els.person.content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => els.person.backdrop.classList.add('hidden'), 200);
+        }
+
+        function togglePersonBio() {
+            state.isBioExpanded = !state.isBioExpanded;
+            els.person.bio.classList.toggle('line-clamp-3', !state.isBioExpanded);
+            els.person.bioBtn.textContent = state.isBioExpanded ? 'Show Less' : 'Read More';
+        }
+
+        // --- FIXED: Swap Logic to handle fetch correctly ---
+        async function swapToMovie(id, type) {
+            if (type !== 'movie' && type !== 'tv') return;
+            
+            closePersonModal();
+            
+            // 1. Update State Context immediately so fetchModalExtras knows which endpoint to use
+            state.mediaType = type;
+            updateUIState();
+
+            // 2. Check if item exists in current results
+            const existing = state.results.find(r => r.id === id);
+
+            if (existing) {
+                openModal(id);
+            } else {
+                // 3. Fetch specific details if not in list
+                els.loader.classList.remove('hidden');
+                try {
+                    const res = await fetch(`${BASE_URL}/${type}/${id}?api_key=${API_KEY}&language=en-US`);
+                    if(!res.ok) throw new Error("Failed to fetch item");
+                    
+                    const data = await res.json();
+                    
+                    // Add to results so openModal can find it
+                    state.results.push(data);
+                    
+                    // Wait slightly for DOM
+                    openModal(id);
+                } catch(e) {
+                    console.error("Error swapping content", e);
+                    alert("Could not load content details.");
+                } finally {
+                    els.loader.classList.add('hidden');
+                }
+            }
+        }
+
+        function handleSearch(val) { state.searchQuery = val; if (state.timer) clearTimeout(state.timer); state.timer = setTimeout(() => fetchContent(), 500); }
+        function handleGenre(val) { state.selectedGenre = val; fetchContent(); }
+        function handleLanguage(val) { state.selectedLanguage = val; fetchContent(); }
+        function handleRating(val) { state.selectedRating = val; fetchContent(); }
+        function setMediaType(type) { state.mediaType = type; state.searchQuery = ''; document.getElementById('search-input').value = ''; state.selectedGenre = ''; fetchGenres(); fetchContent(); }
+        function loadMore() { state.page++; fetchContent(true); }
+        function resetApp() { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    </script>
+</body>
+</html>
